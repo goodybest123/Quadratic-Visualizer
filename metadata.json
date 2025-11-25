@@ -1,0 +1,5 @@
+{
+  "name": "Interactive Quadratic Visualizer",
+  "description": "An interactive web application to visualize quadratic functions (y = ax² + bx + c). Adjust coefficients with sliders, see real-time updates to the graph, vertex, roots, and other key properties. Features an AI-powered explanation of the current graph.",
+  "requestFramePermissions": []
+}
