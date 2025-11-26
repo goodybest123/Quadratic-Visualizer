@@ -37,7 +37,7 @@ export const Plot: React.FC<PlotProps> = ({ coefficients, stats, view, setView }
     
     // Clear and background
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#3a3f4b';
+    ctx.fillStyle = '#1f2937'; // Slightly darker background for contrast
     ctx.fillRect(0, 0, width, height);
 
     const niceStep = (range: number) => {
@@ -56,66 +56,68 @@ export const Plot: React.FC<PlotProps> = ({ coefficients, stats, view, setView }
     // Draw grid
     ctx.lineWidth = 1;
     if (view.grid) {
-        ctx.strokeStyle = 'rgba(200, 220, 255, 0.1)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'; // Fainter grid
+        ctx.beginPath();
         for(let x = Math.ceil(view.xMin/xStep)*xStep; x <= view.xMax; x += xStep) {
             const [X] = worldToScreen(x, 0);
-            ctx.beginPath(); ctx.moveTo(X, 0); ctx.lineTo(X, height); ctx.stroke();
+            ctx.moveTo(X, 0); ctx.lineTo(X, height);
         }
         for(let y = Math.ceil(view.yMin/yStep)*yStep; y <= view.yMax; y += yStep) {
             const [, Y] = worldToScreen(0, y);
-            ctx.beginPath(); ctx.moveTo(0, Y); ctx.lineTo(width, Y); ctx.stroke();
+            ctx.moveTo(0, Y); ctx.lineTo(width, Y);
         }
+        ctx.stroke();
     }
 
     // Axes lines
     const [originX, originY] = worldToScreen(0, 0);
-    ctx.strokeStyle = 'rgba(200, 220, 255, 0.25)';
+    ctx.strokeStyle = '#9ca3af'; // Gray-400
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(width, originY); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, height); ctx.stroke();
+    ctx.beginPath();
+    // Only draw if within bounds, but simple line across screen handles all cases gracefully
+    ctx.moveTo(0, originY); ctx.lineTo(width, originY); 
+    ctx.moveTo(originX, 0); ctx.lineTo(originX, height); 
+    ctx.stroke();
 
     // --- Draw Axis Numbers and Ticks ---
-    ctx.fillStyle = '#9ca3af'; // gray-400
-    ctx.font = '11px sans-serif';
-    const fmt = (n: number) => parseFloat(n.toPrecision(10)).toString();
+    ctx.fillStyle = '#d1d5db'; // Gray-300
+    ctx.font = '11px "Inter", sans-serif';
+    const fmt = (n: number) => {
+        if (Math.abs(n) >= 10000) return n.toExponential(1);
+        return parseFloat(n.toPrecision(10)).toString();
+    };
 
     // X Axis Labels
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
+    ctx.beginPath();
     for(let x = Math.ceil(view.xMin/xStep)*xStep; x <= view.xMax; x += xStep) {
-        if (Math.abs(x) < 1e-9) continue; // Skip 0
+        if (Math.abs(x) < xStep / 100) continue; // Skip near 0
         const [X] = worldToScreen(x, 0);
         
         // Tick
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(200, 220, 255, 0.5)';
-        ctx.lineWidth = 1;
         ctx.moveTo(X, originY);
         ctx.lineTo(X, originY + 5);
-        ctx.stroke();
-
+        
         // Label
         ctx.fillText(fmt(x), X, originY + 8);
     }
-
+    
     // Y Axis Labels
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     for(let y = Math.ceil(view.yMin/yStep)*yStep; y <= view.yMax; y += yStep) {
-        if (Math.abs(y) < 1e-9) continue; // Skip 0
+        if (Math.abs(y) < yStep / 100) continue; // Skip near 0
         const [, Y] = worldToScreen(0, y);
         
         // Tick
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(200, 220, 255, 0.5)';
-        ctx.lineWidth = 1;
         ctx.moveTo(originX, Y);
         ctx.lineTo(originX - 5, Y);
-        ctx.stroke();
 
         // Label
         ctx.fillText(fmt(y), originX - 8, Y);
     }
+    ctx.stroke(); // Stroke the ticks
 
     // Origin Label
     ctx.textAlign = 'right';
@@ -126,14 +128,27 @@ export const Plot: React.FC<PlotProps> = ({ coefficients, stats, view, setView }
     // Draw parabola
     const { a, b, c } = coefficients;
     ctx.beginPath();
-    ctx.strokeStyle = '#d946ef'; // Magenta
-    ctx.lineWidth = 2.5;
-    for (let i = 0; i <= width; i++) {
+    ctx.strokeStyle = '#38bdf8'; // Sky-400 (Cyan)
+    ctx.lineWidth = 3;
+    
+    let started = false;
+    for (let i = 0; i <= width; i+=2) { // Step optimization
         const x = view.xMin + (i / width) * (view.xMax - view.xMin);
         const y = a * x * x + b * x + c;
+        
+        // Clip extremely large values to prevent canvas rendering issues
+        if (Math.abs(y) > Math.max(Math.abs(view.yMin), Math.abs(view.yMax)) * 100) {
+            started = false;
+            continue;
+        }
+
         const [X, Y] = worldToScreen(x, y);
-        if (i === 0) ctx.moveTo(X, Y);
-        else ctx.lineTo(X, Y);
+        if (!started) {
+            ctx.moveTo(X, Y);
+            started = true;
+        } else {
+            ctx.lineTo(X, Y);
+        }
     }
     ctx.stroke();
 
@@ -142,28 +157,33 @@ export const Plot: React.FC<PlotProps> = ({ coefficients, stats, view, setView }
 
     // Axis of symmetry
     const [axisX] = worldToScreen(axisOfSymmetry, 0);
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = 'rgba(200, 220, 255, 0.4)';
+    ctx.save();
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(axisX, 0); ctx.lineTo(axisX, height); ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.restore();
     
+    // Helper for dots
+    const drawDot = (x: number, y: number, color: string, radius: number = 4) => {
+        const [sx, sy] = worldToScreen(x, y);
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(sx, sy, radius, 0, 2 * Math.PI); ctx.fill();
+        ctx.strokeStyle = '#1f2937'; // outline for visibility
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    };
+
     // Vertex
-    const [vx, vy] = worldToScreen(vertex.h, vertex.k);
-    ctx.fillStyle = '#f59e0b'; // Warm Orange
-    ctx.beginPath(); ctx.arc(vx, vy, 5, 0, 2 * Math.PI); ctx.fill();
+    drawDot(vertex.h, vertex.k, '#facc15', 6); // Yellow
 
     // Y-intercept
-    const [yintX, yintY] = worldToScreen(0, yIntercept);
-    ctx.fillStyle = '#f59e0b'; // Warm Orange
-    ctx.beginPath(); ctx.arc(yintX, yintY, 4, 0, 2 * Math.PI); ctx.fill();
+    drawDot(0, yIntercept, '#a78bfa'); // Purple
 
     // Roots
     if (roots) {
-        ctx.fillStyle = '#f59e0b'; // Warm Orange
         roots.forEach(root => {
-            const [rx, ry] = worldToScreen(root, 0);
-            ctx.beginPath(); ctx.arc(rx, ry, 4, 0, 2 * Math.PI); ctx.fill();
+            drawDot(root, 0, '#4ade80', 5); // Green
         });
     }
 
@@ -227,16 +247,19 @@ export const Plot: React.FC<PlotProps> = ({ coefficients, stats, view, setView }
   };
 
   return (
-      <div className="h-full w-full bg-[#21252b] rounded-lg overflow-hidden">
+      <div className="h-full w-full bg-[#1f2937] rounded-lg overflow-hidden relative shadow-inner">
           <canvas
             ref={canvasRef}
-            className="w-full h-full cursor-grab"
+            className="w-full h-full cursor-grab block"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
             onWheel={handleWheel}
           />
+          <div className="absolute top-2 right-2 text-[10px] text-gray-500 pointer-events-none opacity-50">
+             Scroll to zoom • Drag to pan
+          </div>
       </div>
   );
 };

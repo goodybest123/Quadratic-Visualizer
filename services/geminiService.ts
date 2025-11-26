@@ -7,23 +7,12 @@ const round = (val: number): number => {
     return Math.round(val * 100) / 100;
 };
 
-let ai: GoogleGenAI | null = null;
-try {
-  // This check prevents a ReferenceError in browser environments where 'process' is not defined.
-  if (typeof process !== 'undefined' && process.env.API_KEY) {
-    ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-  }
-} catch (e) {
-    console.error("Failed to initialize GoogleGenAI. API key might be missing or 'process' is not available in this environment.", e);
-}
-
+// Initialize the AI client directly.
+// note: In a build environment (like Vite/Netlify), process.env.API_KEY is replaced by the actual key string.
+// We do not check for 'process' existence to avoid issues where the variable is replaced but the global process object is missing.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
 export const getParabolaExplanationAudio = async (a: number, stats: QuadraticStats, audioContext: AudioContext): Promise<AudioBuffer | null> => {
-    if (!ai) {
-        console.error("AI service not initialized. An API key may be missing in the environment configuration.");
-        return null;
-    }
-    
     const h = stats.vertex.h;
     const k = stats.vertex.k;
 
@@ -73,11 +62,6 @@ export const getAIAssistantFeedback = async (
     currentCoefficients: Coefficients,
     stats: QuadraticStats
 ): Promise<string> => {
-    if (!ai) {
-        console.error("AI service not initialized. An API key may be missing in the environment configuration.");
-        throw new Error("AI service is not configured.");
-    }
-
     const { a, b, c } = currentCoefficients;
     const { vertex, roots, yIntercept, discriminant } = stats;
 
